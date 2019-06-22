@@ -1,0 +1,132 @@
+#!/bin/bash
+
+function showHelp {
+    printf "Usage: yaud [OPTION] [URL]\n"
+    printf "Download the best-quality audio version of something with youtube-dl.\n"
+    printf "If the downloaded file is a WebM, extract the audio with ffmpeg.\n\n"
+    printf "  -k, --keep	Don't delete original file after any conversion\n"
+    printf "  -h, --help	Show this help message\n"
+}
+
+################################################################ Argument validation
+# Check if user passed --help or --keep
+# Also figure out which arg is the URL
+for arg in "$@"; do
+    if [[ "$arg" =~ -h|--help ]]; then
+        showHelp
+        exit 0
+    elif [[ "$arg" =~ -k|--keep ]]; then
+        keep=1
+    elif [[ "$arg" == -* ]]; then
+        printf "ERROR: Unrecognized option \"$arg\"\n\n"
+        showHelp
+        exit 1
+    else
+        url_arg="$arg"
+        ((urls++))
+    fi
+done
+
+if [[ ! $# =~ [1-2] ]]; then
+    if [[ $# > 2 ]]; then
+        printf "ERROR: Too many arguments provided\n\n"
+    fi
+    showHelp
+    exit 1
+fi
+
+if [[ $urls > 1 ]]; then
+    printf "ERROR: multiple arguments provided for URL\n\n"
+    showHelp
+    exit 1
+fi
+
+if [[ -z $url_arg ]]; then
+    printf "ERROR: no URL provided\n\n"
+    showHelp
+    exit 1
+fi
+
+################################################################ Download audio
+# Fetch the video
+ytdl_output=$(youtube-dl -f bestaudio $url_arg | tee /dev/tty)
+
+# Get the line with the filename
+songname=$(printf "$ytdl_output" | grep Destination)
+# Now get just the filename
+songname=${songname##*: }
+
+if [ "$songname" = "" ]; then
+    # Okay, get the *actual* line with the filename
+    songname=$(printf "$ytdl_output" | grep "already")
+    songname=${songname#* }
+    songname=${songname% has already been downloaded}
+    printf "\nDownload failed"
+    if [[ -e "$songname" ]]; then
+        printf ', because file already exists. Continue? (y/n) '
+        read answer
+        if [[ "$answer" != "y" ]] && [[ "$answer" != "yes" ]]; then
+            exit 0
+        fi
+    else
+        printf "\nERROR: Cannot continue without file\n"
+        exit 1
+    fi
+else
+    printf "Downloaded $songname\n\n"
+fi
+
+song_ext=${songname##*.}
+
+# If the file doesn't end in .webm, we're done
+if [[ ! "$songname" == *.webm ]]; then
+    printf "Success!\n"
+    exit 0
+fi
+
+################################################################ Fix container if needed
+
+printf "File extension is .webm. Attempting conversion...\n\n"
+
+if [[ -z $(which ffmpeg) ]]; then
+    printf 'ERROR: ffmpeg not found in $PATH\n'
+    printf "Could not convert file\n"
+    exit 1
+fi
+
+ffprobe_output=$(ffmpeg -i "$songname" 2>&1 | grep "Audio")
+
+# Get audio type from that output
+new_type=${ffprobe_output##*Audio: }
+new_type=${new_type%%,*}
+
+printf "Actual audio type is \"$new_type\"\n\n"
+
+case $new_type in
+    opus)
+        new_ext=opus
+        ;;
+    vorbis)
+        new_ext=ogg
+        ;;
+    *)
+        printf "ERROR: Could not determine proper file extension\n"
+        exit 1
+        ;;
+esac
+
+base_name=${songname%webm}
+
+final_name="$base_name$new_ext"
+printf "Writing to $final_name\n\n"
+
+ffmpeg -v 24 -i "$songname" -vn -acodec copy "$final_name"
+
+if [[ "$keep" != 1 ]]; then
+    printf "Removing original WebM\n"
+    rm "$songname"
+else
+    printf "Not removing original WebM\n"
+fi
+
+printf "Success!\n"
