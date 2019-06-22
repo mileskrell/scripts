@@ -4,7 +4,7 @@ function showHelp {
     printf "Usage: yaud [OPTION] [URL]\n"
     printf "Download the best-quality audio version of something with youtube-dl.\n"
     printf "If the downloaded file is a WebM, extract the audio with ffmpeg.\n\n"
-    printf "  -k, --keep	Don't delete original file after any conversion\n"
+    printf "  -k, --keep	Don't delete original WebM file after conversion\n"
     printf "  -h, --help	Show this help message\n"
 }
 
@@ -47,6 +47,12 @@ if [[ -z $url_arg ]]; then
     exit 1
 fi
 
+################################################################ Check for youtube-dl
+if [[ -z $(which youtube-dl 2>/dev/null) ]]; then
+    printf 'ERROR: youtube-dl not found in $PATH\n'
+    exit 1
+fi
+
 ################################################################ Download audio
 # Fetch the video
 ytdl_output=$(youtube-dl -f bestaudio $url_arg | tee /dev/tty)
@@ -85,12 +91,11 @@ if [[ ! "$songname" == *.webm ]]; then
 fi
 
 ################################################################ Fix container if needed
-
 printf "File extension is .webm. Attempting conversion...\n\n"
 
-if [[ -z $(which ffmpeg) ]]; then
+if [[ -z $(which ffmpeg 2>/dev/null) ]]; then
     printf 'ERROR: ffmpeg not found in $PATH\n'
-    printf "Could not convert file\n"
+    printf "Could not extract audio\n"
     exit 1
 fi
 
