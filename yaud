@@ -48,7 +48,7 @@ if [[ -z $url_arg ]]; then
 fi
 
 ################################################################ Check for youtube-dl
-if [[ -z $(which youtube-dl 2>/dev/null) ]]; then
+if ! command -v youtube-dl > /dev/null 2>&1; then
     printf 'ERROR: youtube-dl not found in $PATH\n'
     exit 1
 fi
@@ -93,7 +93,7 @@ fi
 ################################################################ Fix container if needed
 printf "File extension is .webm. Attempting conversion...\n\n"
 
-if [[ -z $(which ffmpeg 2>/dev/null) ]]; then
+if ! command -v ffmpeg > /dev/null 2>&1; then
     printf 'ERROR: ffmpeg not found in $PATH\n'
     printf "Could not extract audio\n"
     exit 1
