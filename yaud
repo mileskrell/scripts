@@ -3,8 +3,8 @@
 function showHelp {
     printf "Usage: yaud [OPTION] [URL]\n"
     printf "Download the best-quality audio version of something with youtube-dl.\n"
-    printf "If the downloaded file is a WebM, extract the audio with ffmpeg.\n\n"
-    printf "  -k, --keep	Don't delete original WebM file after conversion\n"
+    printf "If the downloaded file is a video, extract the audio with ffmpeg.\n\n"
+    printf "  -k, --keep	Don't delete original video file after conversion\n"
     printf "  -h, --help	Show this help message\n"
 }
 
@@ -84,14 +84,14 @@ fi
 
 song_ext=${songname##*.}
 
-# If the file doesn't end in .webm, we're done
-if [[ ! "$songname" == *.webm ]]; then
+# If the file isn't a video, we're done
+if [[ "$songname" != *.webm ]] && [[ "$songname" != *.mp4 ]]; then
     printf "Success!\n"
     exit 0
 fi
 
 ################################################################ Fix container if needed
-printf "File extension is .webm. Attempting conversion...\n\n"
+printf "File extension is .$song_ext. Attempting conversion...\n\n"
 
 if ! command -v ffmpeg > /dev/null 2>&1; then
     printf 'ERROR: ffmpeg not found in $PATH\n'
@@ -105,6 +105,10 @@ ffprobe_output=$(ffmpeg -i "$songname" 2>&1 | grep "Audio")
 new_type=${ffprobe_output##*Audio: }
 new_type=${new_type%%,*}
 
+# If we have any spaces, use whatever is before the first space.
+# E.g. "aac (LC) (mp4a / 0x6134706D)" becomes "aac"
+new_type=${new_type%% *}
+
 printf "Actual audio type is \"$new_type\"\n\n"
 
 case $new_type in
@@ -114,13 +118,16 @@ case $new_type in
     vorbis)
         new_ext=ogg
         ;;
+    aac)
+        new_ext=aac
+        ;;
     *)
         printf "ERROR: Could not determine proper file extension\n"
         exit 1
         ;;
 esac
 
-base_name=${songname%webm}
+base_name=${songname%$song_ext}
 
 final_name="$base_name$new_ext"
 printf "Writing to $final_name\n\n"
@@ -128,10 +135,10 @@ printf "Writing to $final_name\n\n"
 ffmpeg -v 24 -i "$songname" -vn -acodec copy "$final_name"
 
 if [[ "$keep" != 1 ]]; then
-    printf "Removing original WebM\n"
+    printf "Removing original video file\n"
     rm "$songname"
 else
-    printf "Not removing original WebM\n"
+    printf "Not removing original video file\n"
 fi
 
 printf "Success!\n"
