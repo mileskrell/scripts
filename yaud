@@ -12,10 +12,10 @@ function showHelp {
 # Check if user passed --help or --keep
 # Also figure out which arg is the URL
 for arg in "$@"; do
-    if [[ "$arg" =~ -h|--help ]]; then
+    if [[ "$arg" = -h ]] || [[ "$arg" = --help ]]; then
         showHelp
         exit 0
-    elif [[ "$arg" =~ -k|--keep ]]; then
+    elif [[ "$arg" = -k ]] || [[ "$arg" = --keep ]]; then
         keep=1
     elif [[ "$arg" == -* ]]; then
         printf "ERROR: Unrecognized option \"$arg\"\n\n"
