@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Dining hall menu bookmarks pretty much
+# This would be in .bashrc but I want KRunner to be able to run it
+
+case "$1" in
+    cd*)
+      cCode="05"
+      cName="Neilson"
+      ;;
+    br*)
+      cCode="01"
+      cName="Brower"
+      ;;
+    b*)
+      cCode="04"
+      cName="Busch"
+      ;;
+    l*)
+      cCode="03"
+      cName="Livi"
+      ;;
+    *)
+      echo "INVALID CAMPUS. Please specify cd, br, b, or l (Cook/Douglass, Brower, Busch, Livingston)."
+      exit 1
+      ;;
+esac
+
+case "$2" in
+  b) mealName="Breakfast";;
+  l) mealName="Lunch";;
+  d) mealName="Dinner";;
+  t) mealName="Knight Room";;
+esac
+
+# It's okay to include "&mealName=" without specifying a campus; looks like FoodPro just ignores it
+x-www-browser "http://menuportal.dining.rutgers.edu/FoodPro/pickmenu.asp?sName=Rutgers+University+Dining&naFlag=1&locationNum=$cCode&locationName=$cName+$mealName&mealName=$mealName"
+
+unset cCode cName mealName
