@@ -18,7 +18,7 @@ for arg in "$@"; do
   elif [[ "$arg" == -k ]] || [[ "$arg" == --keep ]]; then
     keep=1
   elif [[ "$arg" == -* ]]; then
-    printf "ERROR: Unrecognized option \"$arg\"\n\n"
+    printf "ERROR: Unrecognized option \"%s\"\n\n" "$arg"
     showHelp
     exit 1
   else
@@ -28,14 +28,14 @@ for arg in "$@"; do
 done
 
 if [[ ! $# =~ [1-2] ]]; then
-  if [[ $# > 2 ]]; then
+  if [[ $# -gt 2 ]]; then
     printf "ERROR: Too many arguments provided\n\n"
   fi
   showHelp
   exit 1
 fi
 
-if [[ $urls > 1 ]]; then
+if [[ $urls -gt 1 ]]; then
   printf "ERROR: multiple arguments provided for URL\n\n"
   showHelp
   exit 1
@@ -49,28 +49,29 @@ fi
 
 ################################################################ Check for youtube-dl
 if ! command -v youtube-dl >/dev/null 2>&1; then
+  # shellcheck disable=SC2016
   printf 'ERROR: youtube-dl not found in $PATH\n'
   exit 1
 fi
 
 ################################################################ Download audio
 # Fetch the video
-ytdl_output=$(youtube-dl -f bestaudio $url_arg | tee /dev/tty)
+ytdl_output=$(youtube-dl -f bestaudio "$url_arg" | tee /dev/tty)
 
 # Get the line with the filename
-songname=$(printf "$ytdl_output" | grep Destination)
+songname=$(printf "%s" "$ytdl_output" | grep Destination)
 # Now get just the filename
 songname=${songname##*: }
 
 if [ "$songname" = "" ]; then
   # Okay, get the *actual* line with the filename
-  songname=$(printf "$ytdl_output" | grep "already")
+  songname=$(printf "%s" "$ytdl_output" | grep "already")
   songname=${songname#* }
   songname=${songname% has already been downloaded}
   printf "\nDownload failed"
   if [[ -e "$songname" ]]; then
     printf ', because file already exists. Continue? (y/n) '
-    read answer
+    read -r answer
     if [[ "$answer" != "y" ]] && [[ "$answer" != "yes" ]]; then
       exit 0
     fi
@@ -79,7 +80,7 @@ if [ "$songname" = "" ]; then
     exit 1
   fi
 else
-  printf "Downloaded $songname\n\n"
+  printf "Downloaded %s\n\n" "$songname"
 fi
 
 song_ext=${songname##*.}
@@ -91,9 +92,10 @@ if [[ "$songname" != *.webm ]] && [[ "$songname" != *.mp4 ]]; then
 fi
 
 ################################################################ Fix container if needed
-printf "File extension is .$song_ext. Attempting conversion...\n\n"
+printf "File extension is .%s. Attempting conversion...\n\n" "$song_ext"
 
 if ! command -v ffmpeg >/dev/null 2>&1; then
+  # shellcheck disable=SC2016
   printf 'ERROR: ffmpeg not found in $PATH\n'
   printf "Could not extract audio\n"
   exit 1
@@ -109,7 +111,7 @@ new_type=${new_type%%,*}
 # E.g. "aac (LC) (mp4a / 0x6134706D)" becomes "aac"
 new_type=${new_type%% *}
 
-printf "Actual audio type is \"$new_type\"\n\n"
+printf "Actual audio type is \"%s\"\n\n" "$new_type"
 
 case $new_type in
 opus)
@@ -130,7 +132,7 @@ esac
 base_name=${songname%$song_ext}
 
 final_name="$base_name$new_ext"
-printf "Writing to $final_name\n\n"
+printf "Writing to %s\n\n" "$final_name"
 
 ffmpeg -v 24 -i "$songname" -vn -acodec copy "$final_name"
 
