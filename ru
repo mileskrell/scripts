@@ -16,21 +16,21 @@
 USERNAME='CHANGEME'
 
 if [ -x "$(command -v zssh)" ]; then
-    printf 'Using zssh for ssh\n\n'
-    SSH='zssh'
+  printf 'Using zssh for ssh\n\n'
+  SSH='zssh'
 else
-    printf 'zssh unavailable; using ssh\n\n'
-    SSH='ssh'
+  printf 'zssh unavailable; using ssh\n\n'
+  SSH='ssh'
 fi
 
-if [[ $1 = '' || $1 =~ ^[1-3]$ ]]; then
-    $SSH $USERNAME@ilab$1.cs.rutgers.edu $2
+if [[ $1 == '' || $1 =~ ^[1-3]$ ]]; then
+  $SSH $USERNAME@ilab$1.cs.rutgers.edu $2
 else
-    if ping -c 1 $1.cs.rutgers.edu &>/dev/null; then
-        $SSH $USERNAME@$1.cs.rutgers.edu $2 2>/dev/null
-    elif ping -c 1 $1.rutgers.edu &>/dev/null; then
-        $SSH $USERNAME@$1.rutgers.edu $2 2>/dev/null
-    else
-        printf 'All connections failed\n'
-    fi
+  if ping -c 1 $1.cs.rutgers.edu &>/dev/null; then
+    $SSH $USERNAME@$1.cs.rutgers.edu $2 2>/dev/null
+  elif ping -c 1 $1.rutgers.edu &>/dev/null; then
+    $SSH $USERNAME@$1.rutgers.edu $2 2>/dev/null
+  else
+    printf 'All connections failed\n'
+  fi
 fi
