@@ -1,48 +1,51 @@
 #!/bin/bash
 
+help_msg="Usage: yaud [OPTION] [URL]
+Download the best-quality audio version of something with youtube-dl.
+If the downloaded file is a video, extract the audio with ffmpeg.
+
+  -k, --keep	Don't delete original video file after conversion
+  -h, --help	Show this help message\n"
+
 function showHelp() {
-  printf "Usage: yaud [OPTION] [URL]\n"
-  printf "Download the best-quality audio version of something with youtube-dl.\n"
-  printf "If the downloaded file is a video, extract the audio with ffmpeg.\n\n"
-  printf "  -k, --keep	Don't delete original video file after conversion\n"
-  printf "  -h, --help	Show this help message\n"
+  printf "%s\n" "$help_msg"
 }
 
 ################################################################ Argument validation
+if [[ $# -eq 0 ]]; then
+  showHelp
+  exit 0
+fi
+
 # Check if user passed --help or --keep
 # Also figure out which arg is the URL
-for arg in "$@"; do
-  if [[ "$arg" == -h ]] || [[ "$arg" == --help ]]; then
+while (("$#")); do
+  if [[ "$1" == -h ]] || [[ "$1" == --help ]]; then
     showHelp
     exit 0
-  elif [[ "$arg" == -k ]] || [[ "$arg" == --keep ]]; then
-    keep=1
-  elif [[ "$arg" == -* ]]; then
-    printf "ERROR: Unrecognized option \"%s\"\n\n" "$arg"
+  elif [[ "$1" == -k ]] || [[ "$1" == --keep ]]; then
+    keep=true
+  elif [[ "$1" == -* ]]; then
+    printf "ERROR: Unrecognized option \"%s\"\n" "$1" >&2
+    echo
     showHelp
     exit 1
   else
-    url_arg="$arg"
     ((urls++))
+    if [[ $urls -gt 1 ]]; then
+      printf "ERROR: multiple arguments provided for URL\n" >&2
+      echo
+      showHelp
+      exit 1
+    fi
+    url_arg="$1"
   fi
+  shift
 done
 
-if [[ ! $# =~ [1-2] ]]; then
-  if [[ $# -gt 2 ]]; then
-    printf "ERROR: Too many arguments provided\n\n"
-  fi
-  showHelp
-  exit 1
-fi
-
-if [[ $urls -gt 1 ]]; then
-  printf "ERROR: multiple arguments provided for URL\n\n"
-  showHelp
-  exit 1
-fi
-
 if [[ -z $url_arg ]]; then
-  printf "ERROR: no URL provided\n\n"
+  printf "ERROR: no URL provided\n" >&2
+  echo
   showHelp
   exit 1
 fi
@@ -50,58 +53,61 @@ fi
 ################################################################ Check for youtube-dl
 if ! command -v youtube-dl >/dev/null 2>&1; then
   # shellcheck disable=SC2016
-  printf 'ERROR: youtube-dl not found in $PATH\n'
+  printf 'ERROR: youtube-dl not found in $PATH\n' >&2
   exit 1
 fi
 
 ################################################################ Download audio
 # Fetch the video
+# TODO: Get filename in a more reliable way
 ytdl_output=$(youtube-dl -f bestaudio "$url_arg" | tee /dev/tty)
 
 # Get the line with the filename
-songname=$(printf "%s" "$ytdl_output" | grep Destination)
+song_name=$(printf "%s" "$ytdl_output" | grep Destination)
 # Now get just the filename
-songname=${songname##*: }
+song_name=${song_name##*: }
 
-if [ "$songname" = "" ]; then
+if [ "$song_name" = "" ]; then
   # Okay, get the *actual* line with the filename
-  songname=$(printf "%s" "$ytdl_output" | grep "already")
-  songname=${songname#* }
-  songname=${songname% has already been downloaded}
-  printf "\nDownload failed"
-  if [[ -e "$songname" ]]; then
-    printf ', because file already exists. Continue? (y/n) '
+  song_name=$(printf "%s" "$ytdl_output" | grep "already")
+  song_name=${song_name#* }
+  song_name=${song_name% has already been downloaded}
+  if [[ -e "$song_name" ]]; then
+    printf "File already exists; redownloading was skipped. Continue? (y/n) "
     read -r answer
     if [[ "$answer" != "y" ]] && [[ "$answer" != "yes" ]]; then
       exit 0
     fi
   else
-    printf "\nERROR: Cannot continue without file\n"
+    printf "ERROR: Download failed\n" >&2
     exit 1
   fi
 else
-  printf "Downloaded %s\n\n" "$songname"
+  printf "Downloaded %s\n" "$song_name"
 fi
 
-song_ext=${songname##*.}
+echo
+
+song_ext=${song_name##*.}
 
 # If the file isn't a video, we're done
-if [[ "$songname" != *.webm ]] && [[ "$songname" != *.mp4 ]]; then
+if [[ "$song_name" != *.webm ]] && [[ "$song_name" != *.mp4 ]]; then
   printf "Success!\n"
   exit 0
 fi
 
 ################################################################ Fix container if needed
-printf "File extension is .%s. Attempting conversion...\n\n" "$song_ext"
+printf "File extension is .%s. Attempting conversion...\n" "$song_ext"
 
 if ! command -v ffmpeg >/dev/null 2>&1; then
   # shellcheck disable=SC2016
-  printf 'ERROR: ffmpeg not found in $PATH\n'
-  printf "Could not extract audio\n"
+  printf 'ERROR: ffmpeg not found in $PATH\n' >&2
+  printf "Could not extract audio\n" >&2
   exit 1
 fi
 
-ffprobe_output=$(ffmpeg -i "$songname" 2>&1 | grep "Audio")
+# TODO: Get audio type in a more reliable way
+ffprobe_output=$(ffmpeg -i "$song_name" |& grep "Audio")
 
 # Get audio type from that output
 new_type=${ffprobe_output##*Audio: }
@@ -111,7 +117,7 @@ new_type=${new_type%%,*}
 # E.g. "aac (LC) (mp4a / 0x6134706D)" becomes "aac"
 new_type=${new_type%% *}
 
-printf "Actual audio type is \"%s\"\n\n" "$new_type"
+printf "Actual audio type is \"%s\"\n" "$new_type"
 
 case $new_type in
 opus)
@@ -124,23 +130,23 @@ aac)
   new_ext=aac
   ;;
 *)
-  printf "ERROR: Could not determine proper file extension\n"
+  printf "ERROR: Could not determine proper file extension\n" >&2
   exit 1
   ;;
 esac
 
-base_name=${songname%$song_ext}
+base_name=${song_name%$song_ext}
 
 final_name="$base_name$new_ext"
-printf "Writing to %s\n\n" "$final_name"
+printf "Writing to %s\n" "$final_name"
 
-ffmpeg -v 24 -i "$songname" -vn -acodec copy "$final_name"
+ffmpeg -v 24 -i "$song_name" -vn -acodec copy "$final_name"
 
-if [[ "$keep" != 1 ]]; then
-  printf "Removing original video file\n"
-  rm "$songname"
+if [[ ! $keep ]]; then
+  printf "Removing original .%s file\n" "$song_ext"
+  rm "$song_name"
 else
-  printf "Not removing original video file\n"
+  printf "Not removing original .%s file\n" "$song_ext"
 fi
 
 printf "Success!\n"
