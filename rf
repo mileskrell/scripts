@@ -35,5 +35,3 @@ esac
 
 # It's okay to include "&mealName=" without specifying a campus; looks like FoodPro just ignores it
 x-www-browser "http://menuportal.dining.rutgers.edu/FoodPro/pickmenu.asp?sName=Rutgers+University+Dining&naFlag=1&locationNum=$cCode&locationName=$cName+$mealName&mealName=$mealName"
-
-unset cCode cName mealName
