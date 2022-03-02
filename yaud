@@ -5,7 +5,7 @@ Download the best-quality audio version of something with youtube-dl.
 If the downloaded file is a video, extract the audio with ffmpeg.
 
   -k, --keep	Don't delete original video file after conversion
-  -h, --help	Show this help message\n"
+  -h, --help	Show this help message"
 
 function showHelp() {
   printf "%s\n" "$help_msg"
